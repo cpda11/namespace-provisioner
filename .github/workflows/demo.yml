@@ -11,7 +11,7 @@ env:
 jobs:
 
   local-build:
-    name: Local build
+    name: Build-test
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, macos-10.15]
