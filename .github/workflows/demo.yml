@@ -12,7 +12,11 @@ jobs:
 
   local-build:
     name: Local build
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04, macos-10.15]
+        go: [1.15, 1.16]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Set up Go
         uses: actions/setup-go@v1
