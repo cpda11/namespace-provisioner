@@ -3,99 +3,30 @@ name: CI
 
 on:
   push:
-    tags:
-      - '*.*.*'
 
 env:
-  TASK_VERSION: 2.8.0
+  IMAGE_VERSION: "5.5.5"
+  IMAGE: "mock-op"
 
 jobs:
-  docker-build:
-    name: Docker build
-    strategy:
-      matrix:
-        os: [ubuntu-16.04, ubuntu-18.04]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Set up task
-        run: |
-          sudo bash -c 'curl -fsSL https://taskfile.dev/install.sh | bash -s -- -b /usr/local/bin v${{ env.TASK_VERSION }}'
-      - name: Set up environment variables
-        run: |
-          echo "::set-env name=DOCKER_REGISTRY::$(echo -n 'docker.pkg.github.com/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Build
-        run: |
-          task docker:build DOCKER_REGISTRY="${DOCKER_REGISTRY}"
-      - name: Test
-        run: |
-          task docker:test
 
   local-build:
     name: Local build
-    strategy:
-      matrix:
-        os: [ubuntu-16.04, ubuntu-18.04, macos-10.15]
-        go: [1.13, 1.14]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - name: Set up Go
         uses: actions/setup-go@v1
         with:
           go-version: ${{ matrix.go }}
-      - name: Set up task
-        run: |
-          sudo bash -c 'curl -fsSL https://taskfile.dev/install.sh | bash -s -- -b /usr/local/bin v${{ env.TASK_VERSION }}'
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Clean
-        run: |
-          task local:clean
       - name: Prepare
-        run: |
-          task local:prepare
+        run: go mod download
       - name: Build
-        run: |
-          task local:build
+        run: GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o build/bin/namespace-provisioner -mod=readonly -v
       - name: Test
         run: |
-          task local:test
-
-  local-build-windows:
-    name: Local build
-    strategy:
-      matrix:
-        os: [windows-2019]
-        go: [1.13, 1.14]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Set up Go
-        uses: actions/setup-go@v1
-        with:
-          go-version: ${{ matrix.go }}
-      - name: Set up task
-        shell: powershell
-        run: |
-          iex (new-object net.webclient).downloadstring('https://get.scoop.sh')
-          scoop bucket add extras
-          scoop install task@${{ env.TASK_VERSION }}
-          echo "::add-path::$Env:HOMEDRIVE$Env:HOMEPATH\scoop\shims"
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Clean
-        shell: bash
-        run: |
-          task local:clean
-      - name: Prepare
-        shell: bash
-        run: |
-          task local:prepare
-      - name: Build
-        shell: bash
-        run: |
-          task local:build
-      - name: Test
-        shell: bash
-        run: |
-          task local:test
+          mkdir -p build/coverage-results
+          mkdir -p build/test-results
+          TEST_RESULT_DIR=../../build/test-results go test -mod=readonly -coverprofile=build/coverage-results/coverage.out -covermode count -v ./...
+          go tool cover -html build/coverage-results/coverage.out -o build/coverage-results/coverage.html

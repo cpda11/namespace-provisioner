@@ -3,19 +3,71 @@ name: CI
 
 on:
   push:
+    tags:
+      - '*.*.*'
 
 env:
-  IMAGE_VERSION: "5.5.5"
-  IMAGE: "mock-op"
+  TASK_VERSION: 2.8.0
 
 jobs:
+  docker-build:
+    name: Docker build
+    strategy:
+      matrix:
+        os: [ubuntu-16.04, ubuntu-18.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Set up task
+      run: |
+        sudo bash -c 'curl -fsSL https://taskfile.dev/install.sh | bash -s -- -b /usr/local/bin v${{ env.TASK_VERSION }}'
+    - name: Set up environment variables
+      run: |
+        echo "::set-env name=DOCKER_REGISTRY::$(echo -n 'docker.pkg.github.com/${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Build
+      run: |
+        task docker:build DOCKER_REGISTRY="${DOCKER_REGISTRY}"
+    - name: Test
+      run: |
+        task docker:test
 
   local-build:
     name: Local build
     strategy:
       matrix:
-        os: [ubuntu-18.04]
-        go: [1.14]
+        os: [ubuntu-16.04, ubuntu-18.04, macos-10.15]
+        go: [1.13, 1.14]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go }}
+    - name: Set up task
+      run: |
+        sudo bash -c 'curl -fsSL https://taskfile.dev/install.sh | bash -s -- -b /usr/local/bin v${{ env.TASK_VERSION }}'
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Clean
+      run: |
+        task local:clean
+    - name: Prepare
+      run: |
+        task local:prepare
+    - name: Build
+      run: |
+        task local:build
+    - name: Test
+      run: |
+        task local:test
+
+  local-build-windows:
+    name: Local build
+    strategy:
+      matrix:
+        os: [windows-2019]
+        go: [1.13, 1.14]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Set up Go
